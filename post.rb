@@ -1,9 +1,3 @@
-# encoding: utf-8
-#
-# Программа «Блокнот», заготовка с классами
-#
-# (с) goodprogrammer.ru
-#
 # Базовый класс «Запись» — здесь мы определим основные методы и свойства,
 # общие для всех типов записей.
 class Post
@@ -12,6 +6,16 @@ class Post
   def initialize
     @created_at = Time.now
     @text = []
+  end
+
+  # Определяем статические методы класса
+  def self.post_types
+    [Memo, Link, Task]
+  end
+
+  # Ищем дочерний класс из массива и создаем его экземпляр
+  def self.create(type_index)
+    post_types[type_index].new
   end
 
   # Метод read_from_console вызываться в программе когда нужно считать ввод
