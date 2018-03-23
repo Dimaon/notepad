@@ -1,41 +1,80 @@
-# Базовый класс «Запись» — здесь мы определим основные методы и свойства,
-# общие для всех типов записей.
+require 'sqlite3'
 class Post
-  # В конструкторе класса определим две переменные экзмепляра: дату создания
-  # записи @created_at (текущий момент) и массив строк записи @text (пустой)
+  @@DB_FILE = './notepad'
+  DB_ERROR = "Не могу выполнить запрос в базу #{@@DB_FILE}"
+
+  def self.find_by_id(id)
+    db = SQLite3::Database.open(@@DB_FILE)
+    db.results_as_hash = true
+
+    begin
+      result = db.execute("SELECT * FROM posts WHERE rowid = ?", id)
+    rescue SQLite3::SQLException
+      puts DB_ERROR
+      exit
+    end
+
+    result = result[0] if result.is_a? Array
+
+    db.close
+
+    if result.empty?
+      puts "Такой id #{id} не найден в базе"
+      return nil
+    else
+      post = create(result['type']) # Создаем экземпляр класса Post
+      post.load_data(result)
+      post
+    end
+  end
+
+  def self.find_all(limit, type)
+    db = SQLite3::Database.open(@@DB_FILE)
+    db.results_as_hash = false
+    query = "SELECT rowid, * FROM posts "
+
+    query << "WHERE type = :type " unless type.nil?
+    query << "ORDER by rowid DESC "
+    query << "LIMIT :limit " unless limit.nil?
+
+    begin
+      statement = db.prepare(query)
+    rescue SQLite3::SQLException
+      puts DB_ERROR
+      exit
+    end
+
+    statement.bind_param('type', type) unless type.nil?
+    statement.bind_param('limit', limit) unless limit.nil?
+
+    result = statement.execute! # Возвращает массив
+
+    statement.close
+    db.close
+
+    result
+  end
+
+
+  def self.post_types
+    {'Memo' => Memo, 'Link' => Link, 'Task' => Task}
+  end
+
+  def self.create(type)
+    post_types[type].new
+  end
+
   def initialize
     @created_at = Time.now
     @text = []
   end
 
-  # Определяем статические методы класса
-  def self.post_types
-    [Memo, Link, Task]
-  end
-
-  # Ищем дочерний класс из массива и создаем его экземпляр
-  def self.create(type_index)
-    post_types[type_index].new
-  end
-
-  # Метод read_from_console вызываться в программе когда нужно считать ввод
-  # пользователя и записать его в нужные поля объекта.
   def read_from_console
-    # Этот метод должен быть реализован у каждого ребенка, так как именно они
-    # знают, как именно считывать свои данные из консоли.
   end
 
-  # Метод to_strings возвращает экземпляр класса в виде массива строк, готовых
-  # к записи в файл.
   def to_strings
-    # Этот метод должен быть реализован у каждого ребенка, так как именно они
-    # знают как именно хранить перевести себя в массив строк.
   end
 
-  # Метод save записывает текущее состояние объекта в файл. Ему все равно,
-  # экземпляр какого именно класса мы записываем, т.к. он вызывает универсальные
-  # методы file_path для получения пути к файлу и to_strings для получения строк
-  # для записи.
   def save
     file = File.new(file_path, 'w:UTF-8') # открываем файл на запись
 
@@ -48,33 +87,48 @@ class Post
     file.close
   end
 
-  # Метод file_path общий для всех классов, он возвращающает путь к файлу, куда
-  # записывать текущий экземпляр.
   def file_path
-    # Сохраним в переменной current_path место, откуда запустили программу
     current_path = File.dirname(__FILE__)
 
-    # Получим имя файла из даты создания поста и названия класса. Метод strftime
-    # формирует строку типа "2016-12-27_12-08-31.txt". Обратите внимание, мы
-    # добавили в название файла даже секунды (%S) — это обеспечит уникальность
-    # мени файла. А с помощью метода class, вызванного у экземпляра класса
-    # мы получим нужный класс, чтобы файл назывался, например:
-    #
-    # link_2016-12-27_12-08-31.txt
+    # например: link_2016-12-27_12-08-31.txt
     file_name = @created_at.strftime("#{self.class.name}_%Y-%m-%d_%H-%M-%S.txt")
 
     # Склеиваем путь из относительного пути к папке и названия файла
     current_path + '/' + file_name
   end
-end
 
-# Весь набор методов, объявленных в родительском классе называется интерфейсом
-# класса. Дети могут по–разному реализовывать методы, но они должны подчиняться
-# общей идее и набору функций, которые заявлены в базовом (родительском классе).
-#
-# В других языках (например, Java) методы, объявленные в классе, но пустые
-# называются абстрактными (здесь это методы to_strings и read_from_console).
-#
-# Смысл абстрактных методов в том, что можно писать базовый класс и пользоваться
-# этими методами, как будто они уже реализованы, не задумываясь о деталях. С
-# деталями реализации методов уже заморачиваются дочерние классы.
+  def save_to_db
+    db = SQLite3::Database.open(@@DB_FILE)
+
+    db.results_as_hash = true
+    begin
+      db.execute(
+            "INSERT INTO posts (" +
+                to_db_hash.keys.join(',') +
+                ")"  +
+                " VALUES (" +
+               ('?,'*to_db_hash.keys.size).chomp(',') +  # ?* - плейсхолдеры, которые замеются нужно число раз
+                ")",
+                to_db_hash.values
+      )
+
+      insert_row_id = db.last_insert_row_id
+      db.close
+      return insert_row_id
+    rescue SQLite3::SQLException
+      puts DB_ERROR
+      exit
+    end
+  end
+
+  def to_db_hash
+    {
+        'type' => self.class.name,
+        'created_at' => @created_at.to_s
+    }
+  end
+
+  def load_data(data_hash)
+    @created_at = Time.parse(data_hash['created_at'])
+  end
+end

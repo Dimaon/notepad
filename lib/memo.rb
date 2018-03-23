@@ -25,4 +25,17 @@ class Memo < Post
     # Возвращаем текст с добавленным в него time_string
     return @text.unshift(time_string)
   end
+
+  def to_db_hash
+    super.merge(
+        {
+            'text' => @text.join('\n\r') # так как text - это массив
+        }
+    )
+  end
+
+  def load_data(data_hash)
+    super(data_hash)
+    @text = data_hash['text'].split('\n\r')
+  end
 end

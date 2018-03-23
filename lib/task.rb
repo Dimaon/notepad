@@ -1,10 +1,3 @@
-# encoding: utf-8
-#
-# Программа «Блокнот», заготовка с классами
-#
-# (с) goodprogrammer.ru
-#
-# Подключим встроенный в руби класс Date для работы с датами
 require 'date'
 
 # Класс «Задача», разновидность базового класса «Запись»
@@ -24,7 +17,7 @@ class Task < Post
     @text = STDIN.gets.chomp
 
     puts "К какому числу надо сделать? Введите дату в формате ДД.ММ.ГГГГ Например, 12.01.2006"
-    @due_date =
+    @due_date = STDIN.gets.chomp
   end
 
   # Этот метод будет возвращать массив из трех строк: дедлайн задачи, описание
@@ -35,5 +28,21 @@ class Task < Post
     deadline = "Крайний срок: #{@due_date}"
 
     return [time_string, @text, deadline]
+  end
+
+  def to_db_hash
+    super.merge(
+             {
+                 'due_date' => @due_date,
+                 'text' => @text
+
+             }
+    )
+
+  end
+
+  def load_data(data_hash)
+    super(data_hash)
+    @due_date = Date.parse(data_hash['due_date'])
   end
 end
