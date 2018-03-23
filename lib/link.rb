@@ -22,6 +22,5 @@ class Link < Post
   # и дата создания
   def to_strings
     time_string = "Создано: #{@created_at.strftime("%Y.%m.%d, %H:%M:%S")} \n\r \n\r"
-
   end
 end

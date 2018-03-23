@@ -24,6 +24,7 @@ class Task < Post
     @text = STDIN.gets.chomp
 
     puts "К какому числу надо сделать? Введите дату в формате ДД.ММ.ГГГГ Например, 12.01.2006"
+    @due_date =
   end
 
   # Этот метод будет возвращать массив из трех строк: дедлайн задачи, описание
@@ -33,6 +34,6 @@ class Task < Post
 
     deadline = "Крайний срок: #{@due_date}"
 
-    return [deadline, @text, time_string]
+    return [time_string, @text, deadline]
   end
 end
